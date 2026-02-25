@@ -58,8 +58,6 @@ jobs:
         go-version: '1.24'
         cache: false
 
-    - name: Build custom linter plugin
-      run: make plugin  # Собираем loglinter.so
     
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v7

@@ -252,8 +252,10 @@ func checkSpecialChars(pass *analysis.Pass, lit *ast.BasicLit, message string) {
 func checkSensitiveData(pass *analysis.Pass, lit *ast.BasicLit, message string) {
 	lowerMsg := strings.ToLower(message)
 	
-	keywords := config.SensitiveKeywords
-	if len(keywords) == 0 {
+	var keywords []string
+	if config != nil && len(config.SensitiveKeywords) > 0 {
+		keywords = config.SensitiveKeywords
+	} else {
 		keywords = []string{
 			"password", "passwd", "pwd",
 			"token", "api_key", "apikey", "api-key",
