@@ -18,6 +18,3 @@ linters:
 #       path: ./loglinter.so
 #       description: Checks log messages for compliance with logging standards
 #       original-url: github.com/dontpanicw/log-linter
-
-issues:
-  exclude-use-default: false

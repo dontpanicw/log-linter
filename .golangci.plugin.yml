@@ -16,6 +16,3 @@ linters:
     - unused
     - gosimple
     - ineffassign
-
-issues:
-  exclude-use-default: false
