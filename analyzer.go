@@ -21,7 +21,7 @@ var sensitiveKeywords = []string{
 	"password", "passwd", "pwd",
 	"token", "api_key", "apikey", "api-key",
 	"secret", "private_key", "privatekey",
-	"credential", "auth",
+	"credential",
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
@@ -83,6 +83,12 @@ func checkLogMessage(pass *analysis.Pass, call *ast.CallExpr) {
 		msgArg = call.Args[0]
 	}
 
+	// Handle string concatenation (BinaryExpr with + operator)
+	if binExpr, ok := msgArg.(*ast.BinaryExpr); ok && binExpr.Op == token.ADD {
+		checkBinaryExpr(pass, binExpr)
+		return
+	}
+
 	// Extract string literal
 	lit, ok := msgArg.(*ast.BasicLit)
 	if !ok || lit.Kind != token.STRING {
@@ -94,17 +100,33 @@ func checkLogMessage(pass *analysis.Pass, call *ast.CallExpr) {
 		return
 	}
 
+	// Rule 2: Check if message is in English (check first, skip other checks if fails)
+	if !checkEnglishOnly(pass, lit, message) {
+		return // Skip other checks for non-English messages
+	}
+
 	// Rule 1: Check if message starts with lowercase
 	checkLowercaseStart(pass, lit, message)
-
-	// Rule 2: Check if message is in English
-	checkEnglishOnly(pass, lit, message)
 
 	// Rule 3: Check for special characters and emojis
 	checkSpecialChars(pass, lit, message)
 
 	// Rule 4: Check for sensitive data
 	checkSensitiveData(pass, lit, message)
+}
+
+// checkBinaryExpr checks string concatenation expressions
+func checkBinaryExpr(pass *analysis.Pass, binExpr *ast.BinaryExpr) {
+	// Check left side
+	if lit, ok := binExpr.X.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+		message := strings.Trim(lit.Value, `"`)
+		checkSensitiveData(pass, lit, message)
+	}
+	
+	// Recursively check if left is also a binary expression
+	if leftBin, ok := binExpr.X.(*ast.BinaryExpr); ok {
+		checkBinaryExpr(pass, leftBin)
+	}
 }
 
 // isSelectorName checks if the call is one of the specified selector names
@@ -134,14 +156,15 @@ func checkLowercaseStart(pass *analysis.Pass, lit *ast.BasicLit, message string)
 }
 
 // Rule 2: Check if message is in English (no Cyrillic or other non-Latin scripts)
-func checkEnglishOnly(pass *analysis.Pass, lit *ast.BasicLit, message string) {
+func checkEnglishOnly(pass *analysis.Pass, lit *ast.BasicLit, message string) bool {
 	for _, r := range message {
 		if unicode.Is(unicode.Cyrillic, r) || unicode.Is(unicode.Han, r) || 
 		   unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) {
 			pass.Reportf(lit.Pos(), "log message should be in English only")
-			return
+			return false
 		}
 	}
+	return true
 }
 
 // Rule 3: Check for special characters and emojis

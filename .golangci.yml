@@ -1,0 +1,13 @@
+linters-settings:
+  custom:
+    loglinter:
+      path: ./loglinter.so
+      description: Checks log messages for compliance with logging standards
+      original-url: github.com/dontpanicw/log-linter
+
+linters:
+  enable:
+    - loglinter
+
+issues:
+  exclude-use-default: false
