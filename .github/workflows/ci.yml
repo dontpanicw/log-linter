@@ -58,14 +58,10 @@ jobs:
         go-version: '1.22'
         cache: false
     
-    - name: Remove golangci config (plugin not available in CI)
-      run: rm -f .golangci.yml
-    
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v7
       with:
         version: latest
-        args: --disable-all --enable=govet,errcheck,staticcheck,unused,gosimple,ineffassign
 
   build:
     name: Build
