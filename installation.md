@@ -41,7 +41,7 @@ make plugin
 
 Это создаст файл `loglinter.so` в корне проекта.
 
-### Шаг 2: Настройка golangci-lint
+### Шаг 2: Настройка `.golangci.yml`
 
 Создайте или обновите файл `.golangci.yml` в корне вашего проекта:
 
@@ -56,6 +56,16 @@ linters-settings:
 linters:
   enable:
     - loglinter
+```
+
+Или используйте готовый конфигурационный файл:
+
+```bash
+# Скопируйте готовую конфигурацию
+cp /path/to/log-linter/.golangci.plugin.yml .golangci.yml
+
+# Обновите путь к плагину
+sed -i 's|./loglinter.so|/path/to/loglinter.so|' .golangci.yml
 ```
 
 ### Шаг 3: Запуск
