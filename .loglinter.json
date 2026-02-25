@@ -1,0 +1,20 @@
+{
+  "check_lowercase": true,
+  "check_english_only": true,
+  "check_special_chars": true,
+  "check_sensitive_data": true,
+  "sensitive_keywords": [
+    "password",
+    "passwd",
+    "pwd",
+    "token",
+    "api_key",
+    "apikey",
+    "api-key",
+    "secret",
+    "private_key",
+    "privatekey",
+    "credential"
+  ],
+  "allowed_punctuation": ".,;:!?"
+}

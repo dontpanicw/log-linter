@@ -1,0 +1,60 @@
+image: golang:1.22
+
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  GO111MODULE: "on"
+  CGO_ENABLED: "1"
+
+cache:
+  paths:
+    - .go/pkg/mod/
+
+before_script:
+  - mkdir -p .go
+  - export GOPATH="$CI_PROJECT_DIR/.go"
+
+test:
+  stage: test
+  script:
+    - go mod download
+    - go test -v -race -coverprofile=coverage.out ./...
+    - go tool cover -func=coverage.out
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.out
+
+lint:
+  stage: test
+  image: golangci/golangci-lint:latest
+  script:
+    - golangci-lint run -v
+
+build:
+  stage: build
+  script:
+    - make build
+    - make plugin
+  artifacts:
+    paths:
+      - bin/loglinter
+      - loglinter.so
+    expire_in: 1 week
+
+release:
+  stage: deploy
+  only:
+    - tags
+  script:
+    - make build
+    - make plugin
+  artifacts:
+    paths:
+      - bin/loglinter
+      - loglinter.so

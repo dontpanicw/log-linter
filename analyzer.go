@@ -16,15 +16,18 @@ var Analyzer = &analysis.Analyzer{
 	Run:  run,
 }
 
-// Sensitive keywords that should not appear in logs
-var sensitiveKeywords = []string{
-	"password", "passwd", "pwd",
-	"token", "api_key", "apikey", "api-key",
-	"secret", "private_key", "privatekey",
-	"credential",
-}
+// Global config
+var config *Config
 
 func run(pass *analysis.Pass) (interface{}, error) {
+	// Load configuration
+	var err error
+	config, err = LoadConfig(".")
+	if err != nil {
+		// Use default config if loading fails
+		config = DefaultConfig()
+	}
+
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
@@ -101,18 +104,26 @@ func checkLogMessage(pass *analysis.Pass, call *ast.CallExpr) {
 	}
 
 	// Rule 2: Check if message is in English (check first, skip other checks if fails)
-	if !checkEnglishOnly(pass, lit, message) {
-		return // Skip other checks for non-English messages
+	if config.CheckEnglishOnly {
+		if !checkEnglishOnly(pass, lit, message) {
+			return // Skip other checks for non-English messages
+		}
 	}
 
 	// Rule 1: Check if message starts with lowercase
-	checkLowercaseStart(pass, lit, message)
+	if config.CheckLowercase {
+		checkLowercaseStart(pass, lit, message)
+	}
 
 	// Rule 3: Check for special characters and emojis
-	checkSpecialChars(pass, lit, message)
+	if config.CheckSpecialChars {
+		checkSpecialChars(pass, lit, message)
+	}
 
 	// Rule 4: Check for sensitive data
-	checkSensitiveData(pass, lit, message)
+	if config.CheckSensitiveData {
+		checkSensitiveData(pass, lit, message)
+	}
 }
 
 // checkBinaryExpr checks string concatenation expressions
@@ -151,7 +162,24 @@ func checkLowercaseStart(pass *analysis.Pass, lit *ast.BasicLit, message string)
 
 	firstRune := rune(message[0])
 	if unicode.IsLetter(firstRune) && unicode.IsUpper(firstRune) {
-		pass.Reportf(lit.Pos(), "log message should start with lowercase letter")
+		// Create suggested fix
+		fixed := string(unicode.ToLower(firstRune)) + message[1:]
+		pass.Report(analysis.Diagnostic{
+			Pos:     lit.Pos(),
+			Message: "log message should start with lowercase letter",
+			SuggestedFixes: []analysis.SuggestedFix{
+				{
+					Message: "Convert first letter to lowercase",
+					TextEdits: []analysis.TextEdit{
+						{
+							Pos:     lit.Pos(),
+							End:     lit.End(),
+							NewText: []byte(`"` + fixed + `"`),
+						},
+					},
+				},
+			},
+		})
 	}
 }
 
@@ -177,10 +205,46 @@ func checkSpecialChars(pass *analysis.Pass, lit *ast.BasicLit, message string) {
 		}
 	}
 
-	// Check for excessive punctuation
-	if strings.Contains(message, "!!!") || strings.Contains(message, "...") ||
-	   strings.Contains(message, "!🚀") {
-		pass.Reportf(lit.Pos(), "log message should not contain excessive punctuation or special characters")
+	// Check for excessive punctuation and create fixes
+	if strings.Contains(message, "!!!") {
+		fixed := strings.ReplaceAll(message, "!!!", "")
+		pass.Report(analysis.Diagnostic{
+			Pos:     lit.Pos(),
+			Message: "log message should not contain excessive punctuation or special characters",
+			SuggestedFixes: []analysis.SuggestedFix{
+				{
+					Message: "Remove excessive punctuation",
+					TextEdits: []analysis.TextEdit{
+						{
+							Pos:     lit.Pos(),
+							End:     lit.End(),
+							NewText: []byte(`"` + fixed + `"`),
+						},
+					},
+				},
+			},
+		})
+		return
+	}
+
+	if strings.Contains(message, "...") {
+		fixed := strings.ReplaceAll(message, "...", "")
+		pass.Report(analysis.Diagnostic{
+			Pos:     lit.Pos(),
+			Message: "log message should not contain excessive punctuation or special characters",
+			SuggestedFixes: []analysis.SuggestedFix{
+				{
+					Message: "Remove excessive punctuation",
+					TextEdits: []analysis.TextEdit{
+						{
+							Pos:     lit.Pos(),
+							End:     lit.End(),
+							NewText: []byte(`"` + fixed + `"`),
+						},
+					},
+				},
+			},
+		})
 	}
 }
 
@@ -188,7 +252,17 @@ func checkSpecialChars(pass *analysis.Pass, lit *ast.BasicLit, message string) {
 func checkSensitiveData(pass *analysis.Pass, lit *ast.BasicLit, message string) {
 	lowerMsg := strings.ToLower(message)
 	
-	for _, keyword := range sensitiveKeywords {
+	keywords := config.SensitiveKeywords
+	if len(keywords) == 0 {
+		keywords = []string{
+			"password", "passwd", "pwd",
+			"token", "api_key", "apikey", "api-key",
+			"secret", "private_key", "privatekey",
+			"credential",
+		}
+	}
+	
+	for _, keyword := range keywords {
 		if strings.Contains(lowerMsg, keyword) {
 			pass.Reportf(lit.Pos(), "log message may contain sensitive data (keyword: %s)", keyword)
 			return
